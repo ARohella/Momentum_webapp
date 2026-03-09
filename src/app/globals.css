@@ -1,26 +1,163 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border-color);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-glass: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Dark theme (default) */
+:root {
+  --bg: #09090b;
+  --fg: #fafafa;
+  --surface: #18181b;
+  --surface-hover: #27272a;
+  --border-color: #27272a;
+  --muted: #71717a;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --glass-bg: rgba(24, 24, 27, 0.7);
+  --glass-border: rgba(63, 63, 70, 0.4);
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg: #fafafa;
+  --fg: #09090b;
+  --surface: #ffffff;
+  --surface-hover: #f4f4f5;
+  --border-color: #e4e4e7;
+  --muted: #a1a1aa;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(228, 228, 231, 0.6);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Glass morphism utility */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* FullCalendar overrides */
+.fc {
+  --fc-border-color: var(--border-color);
+  --fc-button-bg-color: var(--surface);
+  --fc-button-border-color: var(--border-color);
+  --fc-button-text-color: var(--fg);
+  --fc-button-hover-bg-color: var(--surface-hover);
+  --fc-button-hover-border-color: var(--border-color);
+  --fc-button-active-bg-color: var(--accent);
+  --fc-button-active-border-color: var(--accent);
+  --fc-today-bg-color: rgba(99, 102, 241, 0.08);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: var(--surface);
+  --fc-event-border-color: transparent;
+  --fc-now-indicator-color: var(--accent);
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+}
+
+.fc .fc-button {
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  font-size: 0.8rem !important;
+  padding: 6px 12px !important;
+  box-shadow: none !important;
+}
+
+.fc .fc-daygrid-day-number,
+.fc .fc-col-header-cell-cushion {
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.fc .fc-timegrid-slot-label-cushion {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.fc .fc-event {
+  border-radius: 6px !important;
+  padding: 0 6px !important;
+  font-size: 0.7rem !important;
+  border: none !important;
+  overflow: hidden !important;
+}
+
+.fc .fc-timegrid-event {
+  border-radius: 6px !important;
+}
+
+.fc .fc-timegrid-event .fc-event-main {
+  display: flex !important;
+  align-items: center !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+}
+
+.fc .fc-timegrid-event .fc-event-title {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.fc .fc-daygrid-event-dot {
+  display: none;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border-color: var(--border-color) !important;
+}
+
+.fc .fc-scrollgrid {
+  border-color: var(--border-color) !important;
+}
+
+/* Compact hourly slots - matches Google Calendar style */
+.fc .fc-timegrid-slot {
+  height: 2.5em !important;
+}
+
+.fc .fc-timegrid-slot-label {
+  vertical-align: top;
 }

@@ -7,8 +7,9 @@ import { useHabitStore } from '@/stores/habitStore';
 import { useGoalStore } from '@/stores/goalStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useRewardsStore } from '@/stores/rewardsStore';
+import { useCoachStore } from '@/stores/coachStore';
 import { CATEGORY_COLORS } from '@/lib/types';
-import { Send, Loader2, CalendarPlus, Check, Sparkles, Mic, MicOff } from 'lucide-react';
+import { Send, Loader2, CalendarPlus, Check, Sparkles, Mic, MicOff, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 // Web Speech API types
@@ -37,14 +38,6 @@ interface ScheduleBlock {
   category: string;
 }
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  text: string;
-  scheduleBlocks?: ScheduleBlock[];
-  acceptedBlocks?: Set<number>;
-}
-
 export default function CoachPage() {
   const events = useCalendarStore((s) => s.events);
   const addEvent = useCalendarStore((s) => s.addEvent);
@@ -54,8 +47,11 @@ export default function CoachPage() {
   const profile = usePreferencesStore((s) => s.profile);
   const categories = usePreferencesStore((s) => s.categories);
   const incrementAI = useRewardsStore((s) => s.incrementAI);
+  const messages = useCoachStore((s) => s.messages);
+  const addMessage = useCoachStore((s) => s.addMessage);
+  const markBlockAccepted = useCoachStore((s) => s.markBlockAccepted);
+  const clearMessages = useCoachStore((s) => s.clearMessages);
 
-  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
@@ -155,13 +151,13 @@ Categories: ${categories.join(', ')}`;
     const text = input.trim();
     if (!text || loading) return;
 
-    const userMsg: Message = {
+    const userMsg = {
       id: Date.now().toString(),
-      role: 'user',
+      role: 'user' as const,
       text,
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    addMessage(userMsg);
     setInput('');
     setLoading(true);
 
@@ -182,35 +178,26 @@ Categories: ${categories.join(', ')}`;
       const data = await res.json();
 
       if (data.error) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            text: `Sorry, I encountered an error: ${data.error}`,
-          },
-        ]);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            text: data.text,
-            scheduleBlocks: data.scheduleBlocks?.length ? data.scheduleBlocks : undefined,
-            acceptedBlocks: new Set(),
-          },
-        ]);
-      }
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
+        addMessage({
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          text: 'Sorry, I couldn\'t connect to the AI service. Please try again.',
-        },
-      ]);
+          text: `Sorry, I encountered an error: ${data.error}`,
+        });
+      } else {
+        addMessage({
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          text: data.text,
+          scheduleBlocks: data.scheduleBlocks?.length ? data.scheduleBlocks : undefined,
+          acceptedBlocks: [],
+        });
+      }
+    } catch {
+      addMessage({
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        text: "Sorry, I couldn't connect to the AI service. Please try again.",
+      });
     } finally {
       setLoading(false);
     }
@@ -224,16 +211,7 @@ Categories: ${categories.join(', ')}`;
       category: block.category || 'personal',
     });
 
-    setMessages((prev) =>
-      prev.map((m) => {
-        if (m.id === messageId && m.acceptedBlocks) {
-          const newAccepted = new Set(m.acceptedBlocks);
-          newAccepted.add(blockIndex);
-          return { ...m, acceptedBlocks: newAccepted };
-        }
-        return m;
-      })
-    );
+    markBlockAccepted(messageId, blockIndex);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -249,10 +227,22 @@ Categories: ${categories.join(', ')}`;
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 text-white">
           <Sparkles size={18} />
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-bold tracking-tight">AI Coach</h1>
           <p className="text-xs text-muted">Your personal productivity assistant</p>
         </div>
+        {messages.length > 0 && (
+          <button
+            onClick={() => {
+              if (confirm('Clear chat history? This cannot be undone.')) clearMessages();
+            }}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-muted hover:text-foreground hover:bg-surface-hover transition-colors"
+            title="Clear chat history"
+          >
+            <Trash2 size={14} />
+            Clear chat
+          </button>
+        )}
       </div>
 
       {/* Messages area */}
@@ -305,7 +295,7 @@ Categories: ${categories.join(', ')}`;
               {msg.scheduleBlocks && msg.scheduleBlocks.length > 0 && (
                 <div className="mt-3 space-y-2">
                   {msg.scheduleBlocks.map((block, i) => {
-                    const accepted = msg.acceptedBlocks?.has(i);
+                    const accepted = msg.acceptedBlocks?.includes(i);
                     return (
                       <div
                         key={i}

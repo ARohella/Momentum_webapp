@@ -2,15 +2,24 @@
 
 import { useState } from 'react';
 import { useGoalStore } from '@/stores/goalStore';
+import { useTaskStore } from '@/stores/taskStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import { CATEGORY_COLORS } from '@/lib/types';
-import { Plus, Target, Trash2, X, TrendingUp } from 'lucide-react';
+import { useRewardsStore } from '@/stores/rewardsStore';
+import { CATEGORY_COLORS, Goal } from '@/lib/types';
+import { Plus, Target, Trash2, X, TrendingUp, Wand2, Loader2, Check } from 'lucide-react';
 import { format } from 'date-fns';
+
+interface BreakdownTask {
+  title: string;
+  estimatedDuration: number;
+  deadline?: string;
+}
 
 export default function GoalsPage() {
   const { goals, addGoal, updateGoal, deleteGoal, incrementProgress, getProgressPercentage } =
     useGoalStore();
   const categories = usePreferencesStore((s) => s.categories);
+  const incrementAI = useRewardsStore((s) => s.incrementAI);
 
   const [showModal, setShowModal] = useState(false);
   const [title, setTitle] = useState('');
@@ -22,6 +31,61 @@ export default function GoalsPage() {
 
   const [incrementId, setIncrementId] = useState<string | null>(null);
   const [incrementAmount, setIncrementAmount] = useState('1');
+
+  const addTask = useTaskStore((s) => s.addTask);
+  const [breakdownGoalId, setBreakdownGoalId] = useState<string | null>(null);
+  const [breakdownTasks, setBreakdownTasks] = useState<BreakdownTask[]>([]);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+  const [addedIndices, setAddedIndices] = useState<Set<number>>(new Set());
+
+  const handleBreakdown = async (goal: Goal) => {
+    setBreakdownGoalId(goal.id);
+    setBreakdownLoading(true);
+    setBreakdownTasks([]);
+    setAddedIndices(new Set());
+    try {
+      const res = await fetch('/api/ai-goal-breakdown', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal, today: format(new Date(), 'yyyy-MM-dd') }),
+      });
+      const data = await res.json();
+      if (Array.isArray(data.tasks)) {
+        setBreakdownTasks(data.tasks);
+        incrementAI('goalBreakdowns');
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setBreakdownLoading(false);
+    }
+  };
+
+  const addBreakdownTask = (i: number, task: BreakdownTask, goalCategory: string) => {
+    addTask({
+      title: task.title,
+      description: '',
+      estimatedDuration: task.estimatedDuration || 60,
+      deadline: task.deadline && task.deadline !== 'null' ? task.deadline : undefined,
+      category: goalCategory,
+    });
+    setAddedIndices((prev) => new Set([...prev, i]));
+  };
+
+  const addAllBreakdownTasks = (goalCategory: string) => {
+    breakdownTasks.forEach((t, i) => {
+      if (!addedIndices.has(i)) {
+        addTask({
+          title: t.title,
+          description: '',
+          estimatedDuration: t.estimatedDuration || 60,
+          deadline: t.deadline && t.deadline !== 'null' ? t.deadline : undefined,
+          category: goalCategory,
+        });
+      }
+    });
+    setAddedIndices(new Set(breakdownTasks.map((_, i) => i)));
+  };
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,6 +227,82 @@ export default function GoalsPage() {
                 <div className="flex items-center justify-center gap-1 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-400">
                   <Target size={12} />
                   Goal Achieved!
+                </div>
+              )}
+
+              {!isComplete && (
+                <button
+                  onClick={() => handleBreakdown(goal)}
+                  className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs font-medium text-accent hover:bg-accent/10 transition-colors"
+                >
+                  <Wand2 size={12} />
+                  AI Breakdown
+                </button>
+              )}
+
+              {breakdownGoalId === goal.id && (
+                <div className="mt-3 rounded-xl border border-accent/30 bg-accent/5 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-accent flex items-center gap-1.5">
+                      <Wand2 size={12} />
+                      AI Suggested Tasks
+                    </p>
+                    <button
+                      onClick={() => setBreakdownGoalId(null)}
+                      className="text-muted hover:text-foreground"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  {breakdownLoading && (
+                    <div className="flex items-center gap-2 text-xs text-muted py-3">
+                      <Loader2 size={12} className="animate-spin" />
+                      Generating milestone tasks...
+                    </div>
+                  )}
+                  {!breakdownLoading && breakdownTasks.length > 0 && (
+                    <>
+                      <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                        {breakdownTasks.map((t, i) => {
+                          const added = addedIndices.has(i);
+                          return (
+                            <div
+                              key={i}
+                              className={`flex items-center gap-2 rounded-lg border p-2 ${
+                                added ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-border bg-background/50'
+                              }`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium truncate">{t.title}</p>
+                                <p className="text-[10px] text-muted">
+                                  {t.estimatedDuration}min{t.deadline && t.deadline !== 'null' ? ` • due ${t.deadline}` : ''}
+                                </p>
+                              </div>
+                              {added ? (
+                                <Check size={14} className="text-emerald-400 shrink-0" />
+                              ) : (
+                                <button
+                                  onClick={() => addBreakdownTask(i, t, goal.category)}
+                                  className="shrink-0 rounded bg-accent px-2 py-1 text-[10px] font-medium text-white hover:bg-accent-hover"
+                                >
+                                  Add
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <button
+                        onClick={() => addAllBreakdownTasks(goal.category)}
+                        className="mt-2 w-full rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
+                      >
+                        Add All to Tasks
+                      </button>
+                    </>
+                  )}
+                  {!breakdownLoading && breakdownTasks.length === 0 && (
+                    <p className="text-xs text-muted py-2">No tasks generated. Try again.</p>
+                  )}
                 </div>
               )}
             </div>

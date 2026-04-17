@@ -32,6 +32,7 @@ import {
   getDemoCalendarEvents,
   getDemoTasks,
   getDemoHabits,
+  getDemoChallenges,
   getDemoJournalEntries,
   getDemoGoals,
   getDemoScreenTimeEntries,
@@ -66,15 +67,18 @@ export function Sidebar() {
       events: [...useCalendarStore.getState().events],
       tasks: [...useTaskStore.getState().tasks],
       habits: [...useHabitStore.getState().habits],
+      challenges: [...useHabitStore.getState().challenges],
       journalEntries: [...useJournalStore.getState().entries],
       goals: [...useGoalStore.getState().goals],
       screenEntries: [...useScreenTimeStore.getState().entries],
     };
 
     // Load demo data by directly setting state
+    const demoHabits = getDemoHabits();
+    const demoChallenges = getDemoChallenges(demoHabits);
     useCalendarStore.setState({ events: getDemoCalendarEvents() });
     useTaskStore.setState({ tasks: getDemoTasks() });
-    useHabitStore.setState({ habits: getDemoHabits() });
+    useHabitStore.setState({ habits: demoHabits, challenges: demoChallenges });
     useJournalStore.setState({ entries: getDemoJournalEntries() });
     useGoalStore.setState({ goals: getDemoGoals() });
     useScreenTimeStore.setState({ entries: getDemoScreenTimeEntries() });
@@ -87,7 +91,10 @@ export function Sidebar() {
     if (b) {
       useCalendarStore.setState({ events: b.events as never[] });
       useTaskStore.setState({ tasks: b.tasks as never[] });
-      useHabitStore.setState({ habits: b.habits as never[] });
+      useHabitStore.setState({
+        habits: b.habits as never[],
+        challenges: (b.challenges || []) as never[],
+      });
       useJournalStore.setState({ entries: b.journalEntries as never[] });
       useGoalStore.setState({ goals: b.goals as never[] });
       useScreenTimeStore.setState({ entries: b.screenEntries as never[] });
@@ -95,7 +102,7 @@ export function Sidebar() {
     } else {
       useCalendarStore.setState({ events: [] });
       useTaskStore.setState({ tasks: [] });
-      useHabitStore.setState({ habits: [] });
+      useHabitStore.setState({ habits: [], challenges: [] });
       useJournalStore.setState({ entries: [] });
       useGoalStore.setState({ goals: [] });
       useScreenTimeStore.setState({ entries: [] });
@@ -117,9 +124,12 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="flex h-16 items-center gap-3 border-b border-border px-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-white font-bold text-sm">
-          M
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo.png"
+          alt="Momentum"
+          className="h-8 w-8 shrink-0 rounded-lg object-cover"
+        />
         {!collapsed && (
           <span className="font-bold text-lg tracking-tight">Momentum</span>
         )}

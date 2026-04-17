@@ -1,25 +1,67 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuid } from 'uuid';
-import { Habit } from '@/lib/types';
-import { format } from 'date-fns';
+import { Habit, StreakChallenge } from '@/lib/types';
+import { format, addDays } from 'date-fns';
 
 const MAX_HABITS = 7;
 
 interface HabitStore {
   habits: Habit[];
+  challenges: StreakChallenge[];
   addHabit: (name: string, category: string) => { success: boolean; message?: string };
   removeHabit: (id: string) => { hadStreak: boolean; streakLength: number };
   toggleCompletion: (id: string, date?: string) => void;
   getActiveHabits: () => Habit[];
   getStreak: (id: string) => number;
   canAddHabit: () => boolean;
+  startChallenge: (habitId: string, targetDays: number) => StreakChallenge;
+  endChallenge: (id: string) => void;
+  getChallengesForHabit: (habitId: string) => StreakChallenge[];
+  getChallengeProgress: (challengeId: string) => { completed: number; total: number };
 }
 
 export const useHabitStore = create<HabitStore>()(
   persist(
     (set, get) => ({
       habits: [],
+      challenges: [],
+      startChallenge: (habitId, targetDays) => {
+        const startDate = format(new Date(), 'yyyy-MM-dd');
+        const endDate = format(addDays(new Date(), targetDays - 1), 'yyyy-MM-dd');
+        const challenge: StreakChallenge = {
+          id: uuid(),
+          habitId,
+          targetDays,
+          startDate,
+          endDate,
+          createdAt: new Date().toISOString(),
+        };
+        set((state) => ({ challenges: [...state.challenges, challenge] }));
+        return challenge;
+      },
+      endChallenge: (id) => {
+        set((state) => ({
+          challenges: state.challenges.filter((c) => c.id !== id),
+        }));
+      },
+      getChallengesForHabit: (habitId) => {
+        return get().challenges.filter((c) => c.habitId === habitId);
+      },
+      getChallengeProgress: (challengeId) => {
+        const challenge = get().challenges.find((c) => c.id === challengeId);
+        if (!challenge) return { completed: 0, total: 0 };
+        const habit = get().habits.find((h) => h.id === challenge.habitId);
+        if (!habit) return { completed: 0, total: challenge.targetDays };
+
+        let completed = 0;
+        const start = new Date(challenge.startDate + 'T00:00:00');
+        for (let i = 0; i < challenge.targetDays; i++) {
+          const d = format(addDays(start, i), 'yyyy-MM-dd');
+          if (habit.completions[d]) completed++;
+        }
+        return { completed, total: challenge.targetDays };
+      },
       addHabit: (name, category) => {
         const active = get().habits.filter((h) => h.isActive);
         if (active.length >= MAX_HABITS) {

@@ -26,12 +26,12 @@ const SUGGESTED_HABITS = [
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { setTheme, addCategory, removeCategory, completeOnboarding, categories } =
+  const { setTheme, addCategory, removeCategory, completeOnboarding, categories, updateProfile, profile } =
     usePreferencesStore();
   const addHabit = useHabitStore((s) => s.addHabit);
 
   const [step, setStep] = useState(0);
-  const [name, setName] = useState('');
+  const [name, setName] = useState(profile.name || '');
   const [selectedCategories, setSelectedCategories] = useState<string[]>(categories);
   const [customCategory, setCustomCategory] = useState('');
   const [selectedHabits, setSelectedHabits] = useState<string[]>([]);
@@ -55,6 +55,8 @@ export default function OnboardingPage() {
   };
 
   const handleFinish = () => {
+    // Persist name
+    updateProfile({ name: name.trim() });
     // Add selected habits
     selectedHabits.forEach((h) => addHabit(h, 'personal'));
     setTheme(selectedTheme);
@@ -101,9 +103,12 @@ export default function OnboardingPage() {
         {/* Step 0: Welcome */}
         {step === 0 && (
           <div className="text-center">
-            <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-accent text-white text-2xl font-bold">
-              M
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="Momentum"
+              className="mb-6 inline-block h-16 w-16 rounded-2xl object-cover"
+            />
             <h1 className="text-3xl font-bold mb-3">Welcome to Momentum</h1>
             <p className="text-muted mb-8 max-w-sm mx-auto">
               Your daily operating system for personal productivity and self-improvement.

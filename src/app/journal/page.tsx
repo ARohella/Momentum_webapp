@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { useJournalStore } from '@/stores/journalStore';
 import { BookOpen, ChevronLeft, ChevronRight, Save } from 'lucide-react';
 import { format, subDays, addDays } from 'date-fns';
+import { Mood, MOOD_EMOJI, MOOD_LABEL } from '@/lib/types';
+
+const MOODS: Mood[] = ['great', 'good', 'okay', 'bad', 'awful'];
 
 export default function JournalPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -18,6 +21,7 @@ export default function JournalPage() {
   const [wentWell, setWentWell] = useState(entry?.wentWell || '');
   const [toImprove, setToImprove] = useState(entry?.toImprove || '');
   const [freeform, setFreeform] = useState(entry?.freeform || '');
+  const [mood, setMood] = useState<Mood | undefined>(entry?.mood);
   const [saved, setSaved] = useState(false);
 
   const handleDateChange = (date: Date) => {
@@ -27,11 +31,17 @@ export default function JournalPage() {
     setWentWell(e?.wentWell || '');
     setToImprove(e?.toImprove || '');
     setFreeform(e?.freeform || '');
+    setMood(e?.mood);
     setSaved(false);
   };
 
+  const handleMoodSelect = (m: Mood) => {
+    setMood(m);
+    useJournalStore.getState().setMood(dateStr, m);
+  };
+
   const handleSave = () => {
-    saveEntry(dateStr, wentWell, toImprove, freeform);
+    saveEntry(dateStr, wentWell, toImprove, freeform, mood);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -69,6 +79,34 @@ export default function JournalPage() {
             >
               <ChevronRight size={18} />
             </button>
+          </div>
+
+          {/* Mood picker */}
+          <div className="mb-6">
+            <label className="mb-2 block text-xs uppercase tracking-wider font-medium text-muted">
+              How are you feeling?
+            </label>
+            <div className="flex gap-2">
+              {MOODS.map((m) => {
+                const selected = mood === m;
+                return (
+                  <button
+                    key={m}
+                    onClick={() => handleMoodSelect(m)}
+                    className={`flex-1 rounded-xl border p-3 transition-all ${
+                      selected
+                        ? 'border-accent bg-accent/10 scale-105'
+                        : 'border-border hover:bg-surface-hover'
+                    }`}
+                  >
+                    <div className="text-2xl">{MOOD_EMOJI[m]}</div>
+                    <div className={`text-[10px] mt-1 ${selected ? 'text-accent font-medium' : 'text-muted'}`}>
+                      {MOOD_LABEL[m]}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Prompts */}

@@ -5,6 +5,7 @@ import { BookOpen, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { useState } from 'react';
+import { MOOD_EMOJI } from '@/lib/types';
 
 export function DashboardJournal() {
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -26,6 +27,9 @@ export function DashboardJournal() {
         <div className="flex items-center gap-2">
           <BookOpen size={18} className="text-purple-400" />
           <h2 className="font-semibold text-lg">Daily Reflection</h2>
+          {entry?.mood && (
+            <span className="text-xl ml-1" title={entry.mood}>{MOOD_EMOJI[entry.mood]}</span>
+          )}
         </div>
         <Link
           href="/journal"

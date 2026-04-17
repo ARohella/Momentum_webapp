@@ -7,10 +7,17 @@ import { DashboardTasks } from '@/components/dashboard/DashboardTasks';
 import { DashboardHabits } from '@/components/dashboard/DashboardHabits';
 import { DashboardJournal } from '@/components/dashboard/DashboardJournal';
 import { DashboardScreenTime } from '@/components/dashboard/DashboardScreenTime';
+import { DashboardProductivityScore } from '@/components/dashboard/DashboardProductivityScore';
+import { DashboardAIBrief } from '@/components/dashboard/DashboardAIBrief';
 import { format } from 'date-fns';
 
 export default function Dashboard() {
   const onboardingCompleted = usePreferencesStore((s) => s.onboardingCompleted);
+  const hasHydrated = usePreferencesStore((s) => s._hasHydrated);
+
+  if (!hasHydrated) {
+    return <div className="min-h-screen" />;
+  }
 
   if (!onboardingCompleted) {
     redirect('/onboarding');
@@ -31,7 +38,7 @@ export default function Dashboard() {
       </div>
 
       {/* Bento Grid */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:grid-rows-[auto_auto]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Calendar - spans 2 cols, 2 rows */}
         <div className="glass rounded-2xl p-5 lg:col-span-2 lg:row-span-2 flex flex-col max-h-[calc(100vh-160px)]">
           <DashboardCalendar />
@@ -40,6 +47,16 @@ export default function Dashboard() {
         {/* Top 3 Tasks */}
         <div className="glass rounded-2xl p-5">
           <DashboardTasks />
+        </div>
+
+        {/* Productivity Score */}
+        <div className="glass rounded-2xl p-5">
+          <DashboardProductivityScore />
+        </div>
+
+        {/* AI Brief - full width */}
+        <div className="glass rounded-2xl p-5 lg:col-span-3">
+          <DashboardAIBrief />
         </div>
 
         {/* Habits */}
@@ -53,7 +70,7 @@ export default function Dashboard() {
         </div>
 
         {/* Screen Time */}
-        <div className="glass rounded-2xl p-5">
+        <div className="glass rounded-2xl p-5 lg:col-span-3">
           <DashboardScreenTime />
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { format, subDays, addDays, startOfToday } from 'date-fns';
-import { CalendarEvent, Task, Habit, JournalEntry, Goal, ScreenTimeEntry, CATEGORY_COLORS } from '@/lib/types';
+import { CalendarEvent, Task, Habit, JournalEntry, Goal, ScreenTimeEntry, StreakChallenge, CATEGORY_COLORS } from '@/lib/types';
 
 const today = startOfToday();
 const todayStr = format(today, 'yyyy-MM-dd');
@@ -137,7 +137,7 @@ export function getDemoTasks(): Task[] {
       estimatedDuration: 30,
       deadline: todayStr,
       category: 'work',
-      completed: false,
+      completed: true,
       isTopThree: true,
       createdAt: subDays(today, 1).toISOString(),
     },
@@ -266,6 +266,7 @@ export function getDemoJournalEntries(): JournalEntry[] {
       wentWell: 'Had a productive deep work session. Finally cracked the caching bug that was bothering me all week.',
       toImprove: 'Got distracted by Slack notifications during focus time. Need to mute channels during deep work blocks.',
       freeform: 'Feeling energized about the project direction. The team retro went really well — we aligned on priorities for the sprint.',
+      mood: 'great',
       createdAt: today.toISOString(),
     },
     {
@@ -274,7 +275,17 @@ export function getDemoJournalEntries(): JournalEntry[] {
       wentWell: 'Completed all three top priorities. Morning gym session gave me great energy for the day.',
       toImprove: 'Stayed up too late reading. Need to stick to the 10:30pm wind-down routine.',
       freeform: 'Interesting conversation with Sarah about potential side project ideas. Might explore the AI tutoring concept more.',
+      mood: 'good',
       createdAt: subDays(today, 1).toISOString(),
+    },
+    {
+      id: uuid(),
+      date: format(subDays(today, 2), 'yyyy-MM-dd'),
+      wentWell: 'Shipped the notification refactor. Felt really good to close out that long-running ticket.',
+      toImprove: 'Ate lunch at my desk again. Should take a proper break.',
+      freeform: 'Quiet, focused day.',
+      mood: 'good',
+      createdAt: subDays(today, 2).toISOString(),
     },
     {
       id: uuid(),
@@ -282,7 +293,17 @@ export function getDemoJournalEntries(): JournalEntry[] {
       wentWell: 'Great progress on the ML assignment. The neural network concepts are finally clicking.',
       toImprove: 'Skipped meditation today — felt rushed in the morning. Should wake up 15 min earlier.',
       freeform: 'Started reading "Designing Data-Intensive Applications". The chapter on replication was fascinating.',
+      mood: 'okay',
       createdAt: subDays(today, 3).toISOString(),
+    },
+    {
+      id: uuid(),
+      date: format(subDays(today, 4), 'yyyy-MM-dd'),
+      wentWell: 'Nothing specific — just a meh kind of day.',
+      toImprove: 'Energy was low. Should have gone for a walk instead of powering through.',
+      freeform: '',
+      mood: 'bad',
+      createdAt: subDays(today, 4).toISOString(),
     },
     {
       id: uuid(),
@@ -290,9 +311,66 @@ export function getDemoJournalEntries(): JournalEntry[] {
       wentWell: 'Presented the quarterly review. Got positive feedback from leadership on the product roadmap.',
       toImprove: 'Need to delegate more — tried to do everything myself and ended up stressed.',
       freeform: '',
+      mood: 'good',
       createdAt: subDays(today, 5).toISOString(),
     },
+    {
+      id: uuid(),
+      date: format(subDays(today, 6), 'yyyy-MM-dd'),
+      wentWell: 'Long run in the morning. Felt amazing afterwards.',
+      toImprove: 'Over-committed socially and ran out of time to prep for Monday.',
+      freeform: 'Weekend reset — cooked a real breakfast for once.',
+      mood: 'great',
+      createdAt: subDays(today, 6).toISOString(),
+    },
   ];
+}
+
+export function getDemoChallenges(habits: Habit[]): StreakChallenge[] {
+  // Find habits by name to tie challenges to them
+  const meditate = habits.find((h) => h.name.toLowerCase().includes('meditate'));
+  const exercise = habits.find((h) => h.name.toLowerCase().includes('exercise'));
+  const read = habits.find((h) => h.name.toLowerCase().includes('read'));
+
+  const challenges: StreakChallenge[] = [];
+
+  if (meditate) {
+    // 30-day challenge, started 18 days ago → 12 days left, good progress
+    challenges.push({
+      id: uuid(),
+      habitId: meditate.id,
+      targetDays: 30,
+      startDate: format(subDays(today, 18), 'yyyy-MM-dd'),
+      endDate: format(addDays(today, 11), 'yyyy-MM-dd'),
+      createdAt: subDays(today, 18).toISOString(),
+    });
+  }
+
+  if (exercise) {
+    // 14-day challenge, started 4 days ago
+    challenges.push({
+      id: uuid(),
+      habitId: exercise.id,
+      targetDays: 14,
+      startDate: format(subDays(today, 4), 'yyyy-MM-dd'),
+      endDate: format(addDays(today, 9), 'yyyy-MM-dd'),
+      createdAt: subDays(today, 4).toISOString(),
+    });
+  }
+
+  if (read) {
+    // 7-day challenge starting today
+    challenges.push({
+      id: uuid(),
+      habitId: read.id,
+      targetDays: 7,
+      startDate: todayStr,
+      endDate: format(addDays(today, 6), 'yyyy-MM-dd'),
+      createdAt: today.toISOString(),
+    });
+  }
+
+  return challenges;
 }
 
 export function getDemoGoals(): Goal[] {

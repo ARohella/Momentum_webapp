@@ -1,13 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuid } from 'uuid';
-import { JournalEntry } from '@/lib/types';
-import { format } from 'date-fns';
+import { JournalEntry, Mood } from '@/lib/types';
 
 interface JournalStore {
   entries: JournalEntry[];
   getEntryForDate: (date: string) => JournalEntry | undefined;
-  saveEntry: (date: string, wentWell: string, toImprove: string, freeform: string) => void;
+  saveEntry: (date: string, wentWell: string, toImprove: string, freeform: string, mood?: Mood) => void;
+  setMood: (date: string, mood: Mood) => void;
   getAllEntries: () => JournalEntry[];
 }
 
@@ -18,12 +18,14 @@ export const useJournalStore = create<JournalStore>()(
       getEntryForDate: (date) => {
         return get().entries.find((e) => e.date === date);
       },
-      saveEntry: (date, wentWell, toImprove, freeform) => {
+      saveEntry: (date, wentWell, toImprove, freeform, mood) => {
         const existing = get().entries.find((e) => e.date === date);
         if (existing) {
           set((state) => ({
             entries: state.entries.map((e) =>
-              e.date === date ? { ...e, wentWell, toImprove, freeform } : e
+              e.date === date
+                ? { ...e, wentWell, toImprove, freeform, mood: mood ?? e.mood }
+                : e
             ),
           }));
         } else {
@@ -36,6 +38,32 @@ export const useJournalStore = create<JournalStore>()(
                 wentWell,
                 toImprove,
                 freeform,
+                mood,
+                createdAt: new Date().toISOString(),
+              },
+            ],
+          }));
+        }
+      },
+      setMood: (date, mood) => {
+        const existing = get().entries.find((e) => e.date === date);
+        if (existing) {
+          set((state) => ({
+            entries: state.entries.map((e) =>
+              e.date === date ? { ...e, mood } : e
+            ),
+          }));
+        } else {
+          set((state) => ({
+            entries: [
+              ...state.entries,
+              {
+                id: uuid(),
+                date,
+                wentWell: '',
+                toImprove: '',
+                freeform: '',
+                mood,
                 createdAt: new Date().toISOString(),
               },
             ],

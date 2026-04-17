@@ -2,12 +2,26 @@
 
 import { useState } from 'react';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import { Save, User } from 'lucide-react';
+import { useRewardsStore } from '@/stores/rewardsStore';
+import { Save, User, Palette, Check } from 'lucide-react';
+import { Achievements } from '@/components/Achievements';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+const ACCENT_OPTIONS = [
+  { name: 'Indigo', value: '#6366f1', hover: '#818cf8' },
+  { name: 'Violet', value: '#8b5cf6', hover: '#a78bfa' },
+  { name: 'Blue', value: '#3b82f6', hover: '#60a5fa' },
+  { name: 'Cyan', value: '#06b6d4', hover: '#22d3ee' },
+  { name: 'Emerald', value: '#10b981', hover: '#34d399' },
+  { name: 'Amber', value: '#f59e0b', hover: '#fbbf24' },
+  { name: 'Rose', value: '#f43f5e', hover: '#fb7185' },
+  { name: 'Pink', value: '#ec4899', hover: '#f472b6' },
+];
+
 export default function ProfilePage() {
-  const { profile, updateProfile } = usePreferencesStore();
+  const { profile, updateProfile, accentColor, setAccentColor } = usePreferencesStore();
+  const recordAccentColor = useRewardsStore((s) => s.recordAccentColor);
   const [saved, setSaved] = useState(false);
 
   const [form, setForm] = useState({ ...profile });
@@ -47,7 +61,14 @@ export default function ProfilePage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 max-w-4xl">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Left column — Achievements */}
+        <div className="lg:sticky lg:top-6 lg:self-start">
+          <Achievements />
+        </div>
+
+        {/* Right column — everything else */}
+        <div className="space-y-6">
         {/* Basic Info */}
         <div className="glass rounded-2xl p-5">
           <h2 className="font-semibold mb-4">Basic Info</h2>
@@ -145,6 +166,46 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Appearance */}
+        <div className="glass rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Palette size={18} className="text-accent" />
+            <h2 className="font-semibold">Appearance</h2>
+          </div>
+          <label className="mb-3 block text-xs font-medium text-muted">Accent Color</label>
+          <div className="flex flex-wrap gap-3">
+            {ACCENT_OPTIONS.map((opt) => {
+              const selected = accentColor === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => {
+                    setAccentColor(opt.value, opt.hover);
+                    recordAccentColor(opt.value);
+                  }}
+                  className="flex flex-col items-center gap-1.5 group"
+                  title={opt.name}
+                >
+                  <div
+                    className={`h-10 w-10 rounded-full flex items-center justify-center transition-all ${
+                      selected ? 'ring-2 ring-offset-2 ring-offset-background scale-110' : 'hover:scale-110'
+                    }`}
+                    style={{
+                      backgroundColor: opt.value,
+                      boxShadow: selected ? `0 0 0 2px ${opt.value}` : undefined,
+                    }}
+                  >
+                    {selected && <Check size={16} className="text-white" />}
+                  </div>
+                  <span className={`text-[10px] ${selected ? 'text-foreground font-medium' : 'text-muted'}`}>
+                    {opt.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Preferences */}
         <div className="glass rounded-2xl p-5">
           <h2 className="font-semibold mb-4">Scheduling Preferences</h2>
@@ -173,6 +234,7 @@ export default function ProfilePage() {
               </select>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>

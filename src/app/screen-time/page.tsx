@@ -13,6 +13,7 @@ export default function ScreenTimePage() {
 
   const [hours, setHours] = useState(todayEntry?.hours?.toString() || '');
   const [minutes, setMinutes] = useState(todayEntry?.minutes?.toString() || '');
+  const [editing, setEditing] = useState(false);
 
   const weeklyAvg = getWeeklyAverage();
   const avgH = Math.floor(weeklyAvg / 60);
@@ -36,6 +37,7 @@ export default function ScreenTimePage() {
     const m = parseInt(minutes) || 0;
     if (h > 0 || m > 0) {
       logScreenTime(today, h, m);
+      setEditing(false);
     }
   };
 
@@ -70,7 +72,7 @@ export default function ScreenTimePage() {
             <Smartphone size={16} />
             Today
           </h2>
-          {todayEntry ? (
+          {todayEntry && !editing ? (
             <div className="text-center py-4">
               <p className="text-4xl font-bold tracking-tight">
                 {todayEntry.hours}<span className="text-lg text-muted">h </span>
@@ -83,8 +85,7 @@ export default function ScreenTimePage() {
                 onClick={() => {
                   setHours(todayEntry.hours.toString());
                   setMinutes(todayEntry.minutes.toString());
-                  // Remove to allow re-log
-                  logScreenTime(today, 0, 0);
+                  setEditing(true);
                 }}
                 className="mt-4 text-xs text-accent hover:text-accent-hover"
               >
@@ -121,12 +122,26 @@ export default function ScreenTimePage() {
                   <p className="text-[10px] text-muted text-center mt-1">Minutes</p>
                 </div>
               </div>
-              <button
-                onClick={handleLog}
-                className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-colors"
-              >
-                Log Screen Time
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleLog}
+                  className="flex-1 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-colors"
+                >
+                  {todayEntry ? 'Save' : 'Log Screen Time'}
+                </button>
+                {todayEntry && (
+                  <button
+                    onClick={() => {
+                      setEditing(false);
+                      setHours(todayEntry.hours.toString());
+                      setMinutes(todayEntry.minutes.toString());
+                    }}
+                    className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted hover:bg-surface-hover transition-colors"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

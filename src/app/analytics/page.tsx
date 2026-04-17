@@ -3,9 +3,12 @@
 import { useCalendarStore } from '@/stores/calendarStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { useHabitStore } from '@/stores/habitStore';
+import { useJournalStore } from '@/stores/journalStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import { CATEGORY_COLORS } from '@/lib/types';
-import { BarChart3 } from 'lucide-react';
+import { CATEGORY_COLORS, MOOD_EMOJI, MOOD_LABEL } from '@/lib/types';
+import { BarChart3, Smile, Download } from 'lucide-react';
+import { generateWeeklyReport } from '@/lib/weeklyReport';
+import { WeeklyReflection } from '@/components/WeeklyReflection';
 import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval, differenceInMinutes } from 'date-fns';
 import {
   BarChart,
@@ -23,6 +26,7 @@ export default function AnalyticsPage() {
   const events = useCalendarStore((s) => s.events);
   const tasks = useTaskStore((s) => s.tasks);
   const habits = useHabitStore((s) => s.habits);
+  const journalEntries = useJournalStore((s) => s.entries);
   const categories = usePreferencesStore((s) => s.categories);
 
   // Calculate time spent per category this week
@@ -94,9 +98,30 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
-        <p className="text-sm text-muted mt-1">Weekly overview of your productivity</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
+          <p className="text-sm text-muted mt-1">Weekly overview of your productivity</p>
+        </div>
+        <button
+          onClick={() => {
+            const report = generateWeeklyReport({
+              weekStart, weekEnd, weekDays, habits: activeHabits,
+              tasks, events, journalEntries, categoryTime,
+            });
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `momentum-weekly-report-${format(weekStart, 'yyyy-MM-dd')}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-colors"
+        >
+          <Download size={16} />
+          Download Weekly Report
+        </button>
       </div>
 
       {/* Stats row */}
@@ -115,6 +140,10 @@ export default function AnalyticsPage() {
             </p>
           </div>
         ))}
+      </div>
+
+      <div className="mb-6">
+        <WeeklyReflection />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -186,6 +215,32 @@ export default function AnalyticsPage() {
               <Bar dataKey="tasks" fill="var(--accent)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+        </div>
+
+        {/* Mood this week */}
+        <div className="glass rounded-2xl p-5 lg:col-span-2">
+          <h2 className="font-semibold mb-4 flex items-center gap-2">
+            <Smile size={16} className="text-accent" />
+            Mood This Week
+          </h2>
+          <div className="grid grid-cols-7 gap-2">
+            {weekDays.map((day) => {
+              const ds = format(day, 'yyyy-MM-dd');
+              const entry = journalEntries.find((e) => e.date === ds);
+              return (
+                <div
+                  key={ds}
+                  className="flex flex-col items-center gap-1 rounded-lg border border-border p-3"
+                >
+                  <span className="text-[10px] text-muted">{format(day, 'EEE')}</span>
+                  <span className="text-2xl">
+                    {entry?.mood ? MOOD_EMOJI[entry.mood] : '—'}
+                  </span>
+                  <span className="text-[10px] text-muted">{format(day, 'd')}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Habit consistency */}

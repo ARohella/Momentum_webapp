@@ -6,9 +6,29 @@ import { useTaskStore } from '@/stores/taskStore';
 import { useHabitStore } from '@/stores/habitStore';
 import { useGoalStore } from '@/stores/goalStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import { useRewardsStore } from '@/stores/rewardsStore';
 import { CATEGORY_COLORS } from '@/lib/types';
-import { Send, Loader2, CalendarPlus, Check, Sparkles } from 'lucide-react';
+import { Send, Loader2, CalendarPlus, Check, Sparkles, Mic, MicOff } from 'lucide-react';
 import { format } from 'date-fns';
+
+// Web Speech API types
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  0: { transcript: string };
+}
+interface SpeechRecognitionEvent extends Event {
+  results: { [index: number]: SpeechRecognitionResult; length: number };
+}
+interface SpeechRecognitionInstance extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onerror: ((e: Event) => void) | null;
+  onend: (() => void) | null;
+}
 
 interface ScheduleBlock {
   title: string;
@@ -33,12 +53,48 @@ export default function CoachPage() {
   const goals = useGoalStore((s) => s.goals);
   const profile = usePreferencesStore((s) => s.profile);
   const categories = usePreferencesStore((s) => s.categories);
+  const incrementAI = useRewardsStore((s) => s.incrementAI);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const SR = (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionInstance; webkitSpeechRecognition?: new () => SpeechRecognitionInstance }).SpeechRecognition
+      || (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionInstance }).webkitSpeechRecognition;
+    if (SR) setVoiceSupported(true);
+  }, []);
+
+  const toggleVoice = () => {
+    if (listening) {
+      recognitionRef.current?.stop();
+      setListening(false);
+      return;
+    }
+    const SR = (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionInstance; webkitSpeechRecognition?: new () => SpeechRecognitionInstance }).SpeechRecognition
+      || (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionInstance }).webkitSpeechRecognition;
+    if (!SR) return;
+    const recognition = new SR();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+    recognition.onresult = (e: SpeechRecognitionEvent) => {
+      const transcript = e.results[0][0].transcript;
+      setInput((prev) => (prev ? prev + ' ' + transcript : transcript));
+      incrementAI('voiceInputsUsed');
+    };
+    recognition.onerror = () => setListening(false);
+    recognition.onend = () => setListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -110,6 +166,7 @@ Categories: ${categories.join(', ')}`;
     setLoading(true);
 
     try {
+      incrementAI('coachMessages');
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -326,6 +383,19 @@ Categories: ${categories.join(', ')}`;
           rows={1}
           style={{ minHeight: '24px' }}
         />
+        {voiceSupported && (
+          <button
+            onClick={toggleVoice}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors ${
+              listening
+                ? 'bg-rose-500 text-white animate-pulse'
+                : 'bg-surface hover:bg-surface-hover text-muted'
+            }`}
+            title={listening ? 'Stop recording' : 'Start voice input'}
+          >
+            {listening ? <MicOff size={16} /> : <Mic size={16} />}
+          </button>
+        )}
         <button
           onClick={handleSend}
           disabled={!input.trim() || loading}

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTaskStore } from '@/stores/taskStore';
 import { useCalendarStore } from '@/stores/calendarStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import { useRewardsStore } from '@/stores/rewardsStore';
 import { CATEGORY_COLORS } from '@/lib/types';
 import {
   Plus,
@@ -15,6 +16,9 @@ import {
   Calendar,
   Clock,
   X,
+  Wand2,
+  Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { format, addMinutes } from 'date-fns';
 import { AIScheduleButton } from '@/components/AIScheduleButton';
@@ -22,7 +26,10 @@ import { AIScheduleButton } from '@/components/AIScheduleButton';
 export default function TasksPage() {
   const { tasks, addTask, updateTask, deleteTask, toggleComplete, toggleTopThree } = useTaskStore();
   const addEvent = useCalendarStore((s) => s.addEvent);
+  const events = useCalendarStore((s) => s.events);
   const categories = usePreferencesStore((s) => s.categories);
+  const focusHours = usePreferencesStore((s) => s.profile.focusHours);
+  const incrementAI = useRewardsStore((s) => s.incrementAI);
 
   const [showModal, setShowModal] = useState(false);
   const [title, setTitle] = useState('');
@@ -33,6 +40,112 @@ export default function TasksPage() {
   const [autoSchedule, setAutoSchedule] = useState(false);
   const [scheduleTime, setScheduleTime] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+
+  // Natural language entry
+  const [nlInput, setNlInput] = useState('');
+  const [nlLoading, setNlLoading] = useState(false);
+  const [nlPreview, setNlPreview] = useState<{ title: string; estimatedDuration: number; deadline?: string; category: string } | null>(null);
+  const [nlError, setNlError] = useState('');
+
+  const handleNlParse = async () => {
+    if (!nlInput.trim() || nlLoading) return;
+    setNlLoading(true);
+    setNlError('');
+    setNlPreview(null);
+    try {
+      const res = await fetch('/api/ai-parse-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: nlInput,
+          today: format(new Date(), 'yyyy-MM-dd'),
+          categories,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) setNlError(data.error);
+      else {
+        setNlPreview(data);
+        incrementAI('tasksParsed');
+      }
+    } catch {
+      setNlError('Failed to parse task.');
+    } finally {
+      setNlLoading(false);
+    }
+  };
+
+  const confirmNlTask = () => {
+    if (!nlPreview) return;
+    addTask({
+      title: nlPreview.title,
+      description: '',
+      estimatedDuration: nlPreview.estimatedDuration,
+      deadline: nlPreview.deadline,
+      category: nlPreview.category,
+    });
+    setNlInput('');
+    setNlPreview(null);
+  };
+
+  // AI Smart Prioritizer
+  const [prioritizeLoading, setPrioritizeLoading] = useState(false);
+  const [prioritizeError, setPrioritizeError] = useState<string | null>(null);
+  const [priorityRanking, setPriorityRanking] = useState<{
+    ranked: { taskId: string; rank: number; reasoning: string }[];
+    summary: string;
+  } | null>(null);
+
+  const handlePrioritize = async () => {
+    setPrioritizeLoading(true);
+    setPrioritizeError(null);
+    try {
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      const incomplete = tasks.filter((t) => !t.completed).slice(0, 20).map((t) => ({
+        id: t.id,
+        title: t.title,
+        estimatedDuration: t.estimatedDuration,
+        deadline: t.deadline || null,
+        category: t.category,
+      }));
+      const todaySchedule = events
+        .filter((e) => e.start.startsWith(todayStr))
+        .map((e) => ({ title: e.title, start: e.start, end: e.end }));
+      const res = await fetch('/api/ai-prioritize-tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tasks: incomplete,
+          todaySchedule,
+          focusTime: focusHours,
+          today: todayStr,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      setPriorityRanking(data);
+      incrementAI('tasksPrioritized');
+    } catch (err) {
+      setPrioritizeError(err instanceof Error ? err.message : 'Failed to prioritize');
+    } finally {
+      setPrioritizeLoading(false);
+    }
+  };
+
+  const applyPriorityRanking = () => {
+    if (!priorityRanking) return;
+    // Clear all existing top-3 first
+    tasks.filter((t) => t.isTopThree).forEach((t) => {
+      if (!priorityRanking.ranked.find((r) => r.taskId === t.id)) {
+        toggleTopThree(t.id);
+      }
+    });
+    // Set the new top-3
+    priorityRanking.ranked.forEach((r) => {
+      const t = tasks.find((x) => x.id === r.taskId);
+      if (t && !t.isTopThree) toggleTopThree(r.taskId);
+    });
+  };
 
   const incompleteTasks = tasks.filter((t) => !t.completed);
   const completedTasks = tasks.filter((t) => t.completed);
@@ -111,6 +224,115 @@ export default function TasksPage() {
           </button>
         </div>
       </div>
+
+      {/* Natural Language Entry */}
+      <div className="glass rounded-2xl p-4 mb-6">
+        <div className="flex items-center gap-2 mb-2">
+          <Wand2 size={14} className="text-accent" />
+          <span className="text-xs font-medium text-muted uppercase tracking-wider">Quick Add with AI</span>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={nlInput}
+            onChange={(e) => setNlInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleNlParse(); }}
+            placeholder='Try: "Finish biology lab report by Friday, 2 hours"'
+            className="flex-1 rounded-lg bg-background border border-border px-3 py-2.5 text-sm focus:border-accent focus:outline-none"
+          />
+          <button
+            onClick={handleNlParse}
+            disabled={!nlInput.trim() || nlLoading}
+            className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-colors disabled:opacity-50"
+          >
+            {nlLoading ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+            Parse
+          </button>
+        </div>
+        {nlError && <p className="text-xs text-rose-400 mt-2">{nlError}</p>}
+        {nlPreview && (
+          <div className="mt-3 rounded-lg border border-accent/30 bg-accent/5 p-3">
+            <p className="text-xs text-muted mb-2">AI parsed your task:</p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <p className="text-sm font-medium">{nlPreview.title}</p>
+                <div className="flex items-center gap-3 mt-1 text-xs text-muted">
+                  <span className="flex items-center gap-1"><Clock size={10} />{nlPreview.estimatedDuration}min</span>
+                  {nlPreview.deadline && <span className="flex items-center gap-1"><Calendar size={10} />due {nlPreview.deadline}</span>}
+                  <span className="rounded px-1.5 py-0.5" style={{ backgroundColor: `${CATEGORY_COLORS[nlPreview.category] || CATEGORY_COLORS.custom}30`, color: CATEGORY_COLORS[nlPreview.category] || CATEGORY_COLORS.custom }}>
+                    {nlPreview.category}
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => setNlPreview(null)} className="rounded-lg px-3 py-1.5 text-xs text-muted hover:bg-surface-hover">Cancel</button>
+                <button onClick={confirmNlTask} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover">Add Task</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* AI Smart Prioritizer */}
+      {incompleteTasks.length > 0 && (
+        <div className="glass rounded-2xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold flex items-center gap-2">
+              <Sparkles size={16} className="text-accent" />
+              AI Smart Prioritizer
+            </h2>
+            <button
+              onClick={handlePrioritize}
+              disabled={prioritizeLoading}
+              className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover transition-colors disabled:opacity-60"
+            >
+              {prioritizeLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+              {prioritizeLoading ? 'Thinking…' : priorityRanking ? 'Re-prioritize' : 'Prioritize My Day'}
+            </button>
+          </div>
+          {prioritizeError && (
+            <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-400 mb-3">
+              {prioritizeError}
+            </div>
+          )}
+          {!priorityRanking && !prioritizeLoading && !prioritizeError && (
+            <p className="text-sm text-muted">
+              AI will analyze your tasks, deadlines, calendar, and focus time to recommend the 3 tasks to tackle today.
+            </p>
+          )}
+          {priorityRanking && (
+            <div>
+              <p className="text-xs text-muted italic mb-3">{priorityRanking.summary}</p>
+              <div className="space-y-2 mb-3">
+                {priorityRanking.ranked.map((r) => {
+                  const t = tasks.find((x) => x.id === r.taskId);
+                  if (!t) return null;
+                  return (
+                    <div
+                      key={r.taskId}
+                      className="flex items-start gap-3 rounded-lg border border-accent/20 bg-accent/5 p-3"
+                    >
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-white font-bold text-sm">
+                        {r.rank}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{t.title}</p>
+                        <p className="text-xs text-muted mt-0.5 leading-relaxed">{r.reasoning}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <button
+                onClick={applyPriorityRanking}
+                className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover transition-colors"
+              >
+                Promote These to Today&apos;s Focus
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Top 3 Focus Section */}
       {topThree.length > 0 && (

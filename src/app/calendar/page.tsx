@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -8,9 +8,12 @@ import interactionPlugin from '@fullcalendar/interaction';
 import { useCalendarStore } from '@/stores/calendarStore';
 import { EventModal } from '@/components/EventModal';
 import { CalendarEvent, CATEGORY_COLORS } from '@/lib/types';
-import { Plus } from 'lucide-react';
+import { Plus, RefreshCw, Loader2, CheckCircle2, X } from 'lucide-react';
 import { RRule } from 'rrule';
 import { differenceInMinutes, addMinutes } from 'date-fns';
+import {
+  isGoogleConfigured, getStoredToken, signInToGoogle, fetchGoogleEvents, clearToken,
+} from '@/lib/googleCalendar';
 import type { EventClickArg, DateSelectArg, EventDropArg } from '@fullcalendar/core';
 import type { EventResizeDoneArg } from '@fullcalendar/interaction';
 
@@ -110,6 +113,74 @@ export default function CalendarPage() {
   const [selectedRange, setSelectedRange] = useState<{ start: string; end: string } | null>(null);
   const calendarRef = useRef<FullCalendar>(null);
 
+  const googleReady = isGoogleConfigured();
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setGoogleConnected(!!getStoredToken());
+  }, []);
+
+  const handleConnectGoogle = useCallback(async () => {
+    setSyncError(null);
+    try {
+      await signInToGoogle();
+      setGoogleConnected(true);
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : 'Failed to connect');
+    }
+  }, []);
+
+  const handleDisconnectGoogle = useCallback(() => {
+    clearToken();
+    setGoogleConnected(false);
+    setLastSynced(null);
+  }, []);
+
+  const handleSyncGoogle = useCallback(async () => {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const now = new Date();
+      const rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const rangeEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+      const gEvents = await fetchGoogleEvents(rangeStart, rangeEnd);
+
+      const existingGoogleIds = new Set(
+        events.filter((e) => e.googleEventId).map((e) => e.googleEventId as string)
+      );
+
+      let added = 0;
+      for (const g of gEvents) {
+        if (existingGoogleIds.has(g.id)) continue;
+        const startStr = g.start.dateTime || (g.start.date ? `${g.start.date}T00:00:00` : null);
+        const endStr = g.end.dateTime || (g.end.date ? `${g.end.date}T00:00:00` : null);
+        if (!startStr || !endStr) continue;
+        addEvent({
+          title: g.summary || '(no title)',
+          description: g.description,
+          start: startStr,
+          end: endStr,
+          category: 'custom',
+          allDay: !g.start.dateTime,
+          source: 'google',
+          googleEventId: g.id,
+        });
+        added++;
+      }
+      setLastSynced(new Date());
+      if (added === 0) setSyncError(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Sync failed';
+      setSyncError(msg);
+      if (msg.includes('expired')) setGoogleConnected(false);
+    } finally {
+      setSyncing(false);
+    }
+  }, [events, addEvent]);
+
   const fcEvents = useMemo(() => expandRecurringEvents(events), [events]);
 
   const handleDateSelect = useCallback((selectInfo: DateSelectArg) => {
@@ -171,20 +242,59 @@ export default function CalendarPage() {
 
   return (
     <div className="min-h-screen p-6">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl font-bold tracking-tight">Calendar</h1>
-        <button
-          onClick={() => {
-            setEditingEvent(undefined);
-            setSelectedRange(null);
-            setModalOpen(true);
-          }}
-          className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-colors"
-        >
-          <Plus size={16} />
-          New Event
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {googleReady && !googleConnected && (
+            <button
+              onClick={handleConnectGoogle}
+              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium hover:bg-white/10 transition-colors"
+            >
+              Connect Google Calendar
+            </button>
+          )}
+          {googleReady && googleConnected && (
+            <>
+              <button
+                onClick={handleSyncGoogle}
+                disabled={syncing}
+                className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium hover:bg-white/10 transition-colors disabled:opacity-60"
+              >
+                {syncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                {syncing ? 'Syncing…' : 'Sync Google'}
+              </button>
+              <button
+                onClick={handleDisconnectGoogle}
+                title="Disconnect Google"
+                className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-xs text-white/70 hover:bg-white/10 transition-colors"
+              >
+                <X size={14} /> Disconnect
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => {
+              setEditingEvent(undefined);
+              setSelectedRange(null);
+              setModalOpen(true);
+            }}
+            className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-colors"
+          >
+            <Plus size={16} />
+            New Event
+          </button>
+        </div>
       </div>
+      {(syncError || lastSynced) && (
+        <div className="mb-4 flex items-center gap-2 text-xs">
+          {syncError && <span className="text-rose-400">{syncError}</span>}
+          {!syncError && lastSynced && (
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <CheckCircle2 size={14} /> Synced at {lastSynced.toLocaleTimeString()}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="glass rounded-2xl p-4">
         <FullCalendar

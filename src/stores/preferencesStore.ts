@@ -18,12 +18,22 @@ interface PreferencesStore {
   categories: string[];
   onboardingCompleted: boolean;
   profile: UserProfile;
+  accentColor: string;
+  accentHover: string;
+  productivityStreak: number;
+  lastProductiveDate: string;
+  focusModeActive: boolean;
+  _hasHydrated: boolean;
+  setHasHydrated: (v: boolean) => void;
   setTheme: (theme: 'dark' | 'light') => void;
   addCategory: (category: string) => void;
   removeCategory: (category: string) => void;
   completeOnboarding: () => void;
   resetOnboarding: () => void;
   updateProfile: (updates: Partial<UserProfile>) => void;
+  setAccentColor: (value: string, hover: string) => void;
+  recordProductivityScore: (score: number, today: string) => void;
+  setFocusMode: (v: boolean) => void;
 }
 
 const DEFAULT_CATEGORIES = ['work', 'health', 'learning', 'personal', 'leisure'];
@@ -47,7 +57,25 @@ export const usePreferencesStore = create<PreferencesStore>()(
       categories: DEFAULT_CATEGORIES,
       onboardingCompleted: false,
       profile: DEFAULT_PROFILE,
+      accentColor: '#6366f1',
+      accentHover: '#818cf8',
+      productivityStreak: 0,
+      lastProductiveDate: '',
+      focusModeActive: false,
+      _hasHydrated: false,
+      setHasHydrated: (v) => set({ _hasHydrated: v }),
       setTheme: (theme) => set({ theme }),
+      setAccentColor: (value, hover) => set({ accentColor: value, accentHover: hover }),
+      recordProductivityScore: (score, today) =>
+        set((state) => {
+          if (state.lastProductiveDate === today) return state;
+          const newStreak = score >= 70 ? state.productivityStreak + 1 : 0;
+          return {
+            productivityStreak: newStreak,
+            lastProductiveDate: today,
+          };
+        }),
+      setFocusMode: (v) => set({ focusModeActive: v }),
       addCategory: (category) =>
         set((state) => ({
           categories: state.categories.includes(category.toLowerCase())
@@ -65,6 +93,11 @@ export const usePreferencesStore = create<PreferencesStore>()(
           profile: { ...state.profile, ...updates },
         })),
     }),
-    { name: 'momentum-preferences' }
+    {
+      name: 'momentum-preferences',
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    }
   )
 );

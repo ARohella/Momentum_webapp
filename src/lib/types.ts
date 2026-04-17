@@ -21,6 +21,8 @@ export interface CalendarEvent {
   taskId?: string;
   recurrence?: string; // RRule string
   allDay?: boolean;
+  source?: 'local' | 'google';
+  googleEventId?: string;
 }
 
 export interface Task {
@@ -47,12 +49,40 @@ export interface Habit {
   isActive: boolean;
 }
 
+export interface StreakChallenge {
+  id: string;
+  habitId: string;
+  targetDays: number;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+  createdAt: string;
+}
+
+export type Mood = 'great' | 'good' | 'okay' | 'bad' | 'awful';
+
+export const MOOD_EMOJI: Record<Mood, string> = {
+  great: '😄',
+  good: '🙂',
+  okay: '😐',
+  bad: '😞',
+  awful: '😩',
+};
+
+export const MOOD_LABEL: Record<Mood, string> = {
+  great: 'Great',
+  good: 'Good',
+  okay: 'Okay',
+  bad: 'Bad',
+  awful: 'Awful',
+};
+
 export interface JournalEntry {
   id: string;
   date: string;
   wentWell: string;
   toImprove: string;
   freeform: string;
+  mood?: Mood;
   createdAt: string;
 }
 

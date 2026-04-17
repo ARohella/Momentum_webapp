@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTaskStore } from '@/stores/taskStore';
-import { Play, Pause, RotateCcw, Timer, Coffee } from 'lucide-react';
+import { usePreferencesStore } from '@/stores/preferencesStore';
+import { useRewardsStore } from '@/stores/rewardsStore';
+import { Play, Pause, RotateCcw, Timer, Coffee, Maximize2, Minimize2 } from 'lucide-react';
 
 type Mode = 'countdown' | 'pomodoro';
 type PomodoroPhase = 'work' | 'break';
@@ -10,6 +12,25 @@ type PomodoroPhase = 'work' | 'break';
 export default function FocusPage() {
   const tasks = useTaskStore((s) => s.tasks);
   const topThree = tasks.filter((t) => t.isTopThree && !t.completed);
+  const focusModeActive = usePreferencesStore((s) => s.focusModeActive);
+  const setFocusMode = usePreferencesStore((s) => s.setFocusMode);
+  const incrementFocusSession = useRewardsStore((s) => s.incrementFocusSession);
+
+  useEffect(() => {
+    if (!focusModeActive) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFocusMode(false);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [focusModeActive, setFocusMode]);
+
+  // Exit focus mode on unmount (navigating away)
+  useEffect(() => {
+    return () => {
+      usePreferencesStore.getState().setFocusMode(false);
+    };
+  }, []);
 
   const [mode, setMode] = useState<Mode>('countdown');
   const [isRunning, setIsRunning] = useState(false);
@@ -45,6 +66,7 @@ export default function FocusPage() {
       if (mode === 'pomodoro') {
         if (pomodoroPhase === 'work') {
           setCompletedPomodoros((c) => c + 1);
+          incrementFocusSession();
           setPomodoroPhase('break');
           setTimeLeft(breakDuration * 60);
           // Auto-start break
@@ -53,6 +75,8 @@ export default function FocusPage() {
           setPomodoroPhase('work');
           setTimeLeft(workDuration * 60);
         }
+      } else {
+        incrementFocusSession();
       }
       // Play notification sound attempt
       try {
@@ -74,7 +98,7 @@ export default function FocusPage() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isRunning, timeLeft, mode, pomodoroPhase, workDuration, breakDuration]);
+  }, [isRunning, timeLeft, mode, pomodoroPhase, workDuration, breakDuration, incrementFocusSession]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
@@ -90,7 +114,17 @@ export default function FocusPage() {
   const activeTask = topThree.find((t) => t.id === selectedTask);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6">
+    <div className={`min-h-screen flex flex-col items-center justify-center p-6 ${focusModeActive ? 'bg-background' : ''}`}>
+      {/* Focus Mode toggle - top right */}
+      <button
+        onClick={() => setFocusMode(!focusModeActive)}
+        className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg glass px-3 py-2 text-xs font-medium hover:bg-surface-hover transition-colors"
+        title={focusModeActive ? 'Exit focus mode (Esc)' : 'Enter focus mode'}
+      >
+        {focusModeActive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        {focusModeActive ? 'Exit Focus' : 'Focus Mode'}
+      </button>
+
       {/* Mode selector */}
       <div className="flex gap-2 mb-8">
         <button

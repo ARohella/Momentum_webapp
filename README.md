@@ -2,9 +2,9 @@
 
 An all-in-one productivity dashboard with AI-assisted scheduling that helps users proactively structure their time around personal priorities.
 
-[![Demo Video](https://img.youtube.com/vi/eR3HOFCPAd8/maxresdefault.jpg)](https://youtu.be/eR3HOFCPAd8)
+🔗 **[Live Demo](https://use-momentum-one.vercel.app/)** · 🎥 **[Watch the Demo Video](https://youtu.be/i-ckLLprsCw)**
 
-**[Watch the Demo Video](https://youtu.be/eR3HOFCPAd8)**
+[![Demo Video](https://img.youtube.com/vi/i-ckLLprsCw/maxresdefault.jpg)](https://youtu.be/i-ckLLprsCw)
 
 ## Problem
 
@@ -23,7 +23,20 @@ Momentum lets users manage their full day from a single dashboard:
 - **Screen Time** — Monitor daily screen time usage
 - **Analytics** — Visualize habit consistency, goal progress, and task completion trends
 - **AI Scheduler** — Analyzes calendar gaps, user profile (wake/sleep times, work hours, workout preferences), and suggests sensible time slots that respect real-world constraints
-- **AI Coach** — Conversational assistant with full user context (events, tasks, habits, goals, profile) that can propose calendar events via embedded JSON blocks, accepted with one click
+- **AI Coach** — Conversational assistant with full user context (events, tasks, habits, goals, profile) that can propose calendar events via embedded JSON blocks, accepted with one click. Supports voice input via the Web Speech API and persists chat history across sessions
+- **AI Daily Brief** — Interactive popup with a Gemini-generated headline, vibe, and commentary on your schedule, focus tasks, habits, and goals — all interactive (check in habits and complete tasks directly from the brief)
+- **AI Smart Task Prioritizer** — Picks today's top-3 tasks from deadlines, your peak focus window, and today's calendar availability, with one-sentence reasoning per pick
+- **AI Weekly Reflection** — Reads the past 7 days and returns patterns, wins, concerns, and recommendations
+- **AI Challenge Coach** — Auto-suggests personalized 7/14/30-day habit challenges based on each habit's consistency
+- **AI Goal Breakdown** — Splits any goal into 5–8 concrete milestone tasks with one-click add
+- **Natural-language Task Entry** — Type "30-minute workout tomorrow morning" and Gemini parses it into a structured task
+- **Rewards & Badges** — 21 badges across tasks, habits, journal, goals, focus sessions, and AI usage, with bronze/silver/gold/legendary tiers
+- **Streak Challenges** — Named 7/14/30-day challenges for any habit with progress rings
+- **Focus Mode** — Full-screen distraction-free timer view that hides the sidebar
+- **Mood Tracking** — Emoji mood picker on the journal with a 7-day mood timeline in Analytics
+- **Google Calendar Sync** — OAuth-based import of real Google Calendar events via Google Identity Services
+- **Accent Color Customization** — 8 color swatches that instantly recolor the entire app
+- **Weekly Digest** — Downloadable `.txt` report summarizing the week
 
 ## Tech Stack
 
@@ -60,6 +73,7 @@ Create a `.env.local` file:
 
 ```
 GEMINI_API_KEY=your_gemini_api_key
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_oauth_client_id   # optional, for Google Calendar sync
 ```
 
 ### Run
